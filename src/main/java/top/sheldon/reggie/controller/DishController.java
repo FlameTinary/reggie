@@ -102,7 +102,7 @@ public class DishController {
         // 精确删除redis缓存
         String key = "dish_" + dishDto.getCategoryId() + "_1";
         redisTemplate.delete(key);
-        
+
         return R.success("菜品添加成功");
     }
 
