@@ -14,6 +14,7 @@ import top.sheldon.reggie.service.UserService;
 import javax.servlet.http.HttpSession;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/user")
@@ -35,8 +36,8 @@ public class UserController {
             // 获取验证码
             String code = ValidateCodeUtils.generateValidateCode4String(4);
             log.info("验证码：{}", code);
-            // 保存验证码到session
-            session.setAttribute(phone, code);
+            // 保存验证码到redis
+            redisTemplate.opsForValue().set(phone, code, 5, TimeUnit.MINUTES);
             // 调用阿里云服务发送短信验证码
             return R.success(code);
         }
@@ -49,10 +50,10 @@ public class UserController {
         String phone = map.get("phone").toString();
         // 获取验证码
         String code = map.get("code").toString();
-        // 从session中提取验证码
-        Object codeInSession = session.getAttribute(phone);
+        // 从redis中提取验证码
+        Object codeInRedis = redisTemplate.opsForValue().get(phone);
         // 比对验证码
-        if (codeInSession != null && codeInSession.equals(code)) {
+        if (codeInRedis != null && codeInRedis.equals(code)) {
             // 判断当前手机号是否已注册
             LambdaQueryWrapper<User> userLambdaQueryWrapper = new LambdaQueryWrapper<User>();
             userLambdaQueryWrapper.eq(User::getPhone, phone);
@@ -65,6 +66,8 @@ public class UserController {
                 userService.save(user);
             }
             session.setAttribute("user", user.getId());
+            // 如果用户登录成功，删除redis中缓存的验证码
+            redisTemplate.delete(phone);
             return R.success(user);
         }
 
